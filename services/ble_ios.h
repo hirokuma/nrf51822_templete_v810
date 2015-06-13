@@ -98,9 +98,8 @@ typedef struct ble_ios_s {
  *
  * @param[in]   p_ios       サービス構造体
  * @param[in]   p_ios_init  サービス初期化構造体
- * @retval      NRF_SUCCESS 成功
  */
-uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init);
+void ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init);
 
 
 /**@brief BLEイベントハンドラ

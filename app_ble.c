@@ -27,15 +27,15 @@
 /**************************************************************************
  * include
  **************************************************************************/
+#include "nrf_soc.h"
+
 #include "boards.h"
-#include "dev.h"
+#include "app_ble.h"
+#include "drivers.h"
 #include "main.h"
 
 #include "app_error.h"
-
-#include "softdevice_handler_appsh.h"
-#include "app_scheduler.h"
-#include "app_timer_appsh.h"
+#include "app_timer.h"
 
 #include "ble_advdata.h"
 #include "ble_conn_params.h"
@@ -43,9 +43,9 @@
 #include "ble_hci.h"
 #include "ble_advertising.h"
 
-#include "app_trace.h"
-
 #include "ble_ios.h"
+
+#include "app_trace.h"
 
 
 /**************************************************************************
@@ -71,34 +71,6 @@
 #define GAP_DEVICE_NAME                 "BLE_TEMPLATE"
 //                                      "12345678901234567890"
 
-
-/*
- * Timer
- */
-/** Value of the RTC1 PRESCALER register. */
-#define APP_TIMER_PRESCALER             (0)
-
-/** BLEが使用するタイマ数(BLEを使うなら1、使わないなら0) */
-#define APP_TIMER_NUM_BLE               (1)
-
-/** ユーザアプリで使用するタイマ数 */
-#define APP_TIMER_NUM_USERAPP           (0)
-
-/** 同時に生成する最大タイマ数 */
-#define APP_TIMER_MAX_TIMERS            (APP_TIMER_NUM_BLE+APP_TIMER_NUM_USERAPP)
-
-/** Size of timer operation queues. */
-#define APP_TIMER_OP_QUEUE_SIZE         (4)
-
-/*
- * Scheduler
- */
-// YOUR_JOB: Modify these according to requirements (e.g. if other event types are to pass through
-//           the scheduler).
-#define SCHED_MAX_EVENT_DATA_SIZE       sizeof(app_timer_event_t)                   /**< Maximum size of scheduler events. Note that scheduler BLE stack events do not contain any data, as the events are being pulled from the stack in the event handler. */
-
-/** Maximum number of events in the scheduler queue. */
-#define SCHED_QUEUE_SIZE                (10)
 
 /*
  * Appearance設定
@@ -268,59 +240,37 @@ static ble_ios_t                        m_ios;
  * prototype
  **************************************************************************/
 
-/* GPIO */
-static void gpio_init(void);
-
-/* Timer */
-static void timers_init(void);
-//static void timers_start(void);
-
-/* Scheduler */
-static void scheduler_init(void);
-
 static void ble_stack_init(void);
+
+#ifdef BLE_DFU_APP_SUPPORT
+static void dfu_reset_prepare(void)
+#endif
 
 static void conn_params_evt_handler(ble_conn_params_evt_t * p_evt);
 static void conn_params_error_handler(uint32_t nrf_error);
 
 static void ble_evt_handler(ble_evt_t * p_ble_evt);
 static void ble_evt_dispatch(ble_evt_t * p_ble_evt);
-static void sys_evt_dispatch(uint32_t sys_evt);
 
 
 static void svc_ios_handler_in(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length);
 static void svc_ios_handler_out(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length);
 
+
 /**************************************************************************
  * public function
  **************************************************************************/
 
-void dev_init(void)
+void app_ble_init(void)
 {
-    gpio_init();
-    timers_init();      //app_button_init()やble_conn_params_init()よりも前に呼ぶこと!
-                        //呼ばなかったら、NRF_ERROR_INVALID_STATE(8)が発生する。
-
-    scheduler_init();
-    ble_stack_init();
-}
-
-
-void dev_event_exec(void)
-{
-    uint32_t err_code;
-
-    //スケジュール済みイベントの実行(mainloop内で呼び出す)
-    app_sched_execute();
-    err_code = sd_app_evt_wait();
-    APP_ERROR_CHECK(err_code);
+	ble_stack_init();
 }
 
 
 /**
  * @brief Advertising開始
  */
-void ble_adv_start(void)
+void app_ble_start(void)
 {
     uint32_t             err_code;
     ble_gap_adv_params_t adv_params;
@@ -352,7 +302,7 @@ void ble_adv_start(void)
 
 
 #ifdef BLE_DFU_APP_SUPPORT
-void ble_adv_stop(void)
+void app_ble_stop(void)
 {
     uint32_t err_code;
 
@@ -364,120 +314,43 @@ void ble_adv_stop(void)
 }
 #endif // BLE_DFU_APP_SUPPORT
 
-int ble_is_connected(void)
+int app_ble_is_connected(void)
 {
 	return m_conn_handle != BLE_CONN_HANDLE_INVALID;
 }
 
-void ble_nofify(const uint8_t *p_data, uint16_t length)
+void app_ble_nofify(const uint8_t *p_data, uint16_t length)
 {
 	//ble_ios_notify(&m_ios, p_data, length);
 }
 
 
-/**********************************************
- * LED
- **********************************************/
-
 /**
- * @brief LED点灯
+ * @brief BLEイベントハンドラ
  *
- * @param[in]   pin     対象PIN番号
- */
-void led_on(int pin)
-{
-    /* アクティブLOW */
-    nrf_gpio_pin_clear(pin);
-}
-
-
-/**
- * @brief LED消灯
+ * @details BLEスタックイベント受信後、メインループのスケジューラから呼ばれる。
  *
- * @param[in]   pin     対象PIN番号
+ * @param[in]   p_ble_evt   BLEスタックイベント
  */
-void led_off(int pin)
+void app_ble_evt_dispatch(ble_evt_t *p_ble_evt)
 {
-    /* アクティブLOW */
-    nrf_gpio_pin_set(pin);
+    ble_evt_handler(p_ble_evt);
+    ble_conn_params_on_ble_evt(p_ble_evt);
+
+    //I/O Service
+    ble_ios_on_ble_evt(&m_ios, p_ble_evt);
+
+#ifdef BLE_DFU_APP_SUPPORT
+    /** @snippet [Propagating BLE Stack events to DFU Service] */
+    ble_dfu_on_ble_evt(&m_dfus, p_ble_evt);
+    /** @snippet [Propagating BLE Stack events to DFU Service] */
+#endif // BLE_DFU_APP_SUPPORT
 }
 
 
 /**************************************************************************
  * private function
  **************************************************************************/
-
-/**********************************************
- * GPIO
- **********************************************/
-
-/**
- * @brief GPIO初期化
- */
-static void gpio_init(void)
-{
-	/* output */
-    nrf_gpio_cfg_input(LED_PIN_NO_ADVERTISING, GPIO_PIN_CNF_PULL_Disabled);
-    nrf_gpio_cfg_input(LED_PIN_NO_CONNECTED, GPIO_PIN_CNF_PULL_Disabled);
-    nrf_gpio_cfg_input(LED_PIN_NO_ASSERT, GPIO_PIN_CNF_PULL_Disabled);
-}
-
-
-/**********************************************
- * タイマ
- **********************************************/
-
-/**
- * @brief タイマ初期化
- *
- * タイマ機能を初期化する。
- * 調べた範囲では、以下の機能を使用する場合には、その初期化よりも前に実行しておく必要がある。
- *  - ボタン
- *  - BLE
- */
-static void timers_init(void)
-{
-    // Initialize timer module, making it use the scheduler
-    APP_TIMER_APPSH_INIT(APP_TIMER_PRESCALER, APP_TIMER_MAX_TIMERS, APP_TIMER_OP_QUEUE_SIZE, true);
-//    APP_TIMER_INIT(APP_TIMER_PRESCALER, APP_TIMER_MAX_TIMERS, APP_TIMER_OP_QUEUE_SIZE, false);
-
-#if 0
-    /* YOUR_JOB: Create any timers to be used by the application.
-                 Below is an example of how to create a timer.
-                 For every new timer needed, increase the value of the macro APP_TIMER_MAX_TIMERS by
-                 one.
-     */
-    err_code = app_timer_create(&m_app_timer_id, APP_TIMER_MODE_REPEATED, timer_timeout_handler);
-    APP_ERROR_CHECK(err_code);
-#endif
-}
-
-#if 0
-/**
- * @brief タイマ開始
- */
-static void timers_start(void)
-{
-    /* YOUR_JOB: Start your timers. below is an example of how to start a timer. */
-    uint32_t err_code;
-
-    err_code = app_timer_start(m_app_timer_id, TIMER_INTERVAL, NULL);
-    APP_ERROR_CHECK(err_code);
-}
-#endif
-
-
-/**********************************************
- * Scheduler
- **********************************************/
-
-/**
- * @brief スケジューラ初期化
- */
-static void scheduler_init(void)
-{
-    APP_SCHED_INIT(SCHED_MAX_EVENT_DATA_SIZE, SCHED_QUEUE_SIZE);
-}
 
 
 /**********************************************
@@ -503,17 +376,6 @@ static void ble_stack_init(void)
 {
     uint32_t err_code;
 
-    /*
-     * SoftDeviceの初期化
-     *      スケジューラの使用：あり
-     */
-//    SOFTDEVICE_HANDLER_APPSH_INIT(NRF_CLOCK_LFCLKSRC_RC_250_PPM_4000MS_CALIBRATION, true);
-    SOFTDEVICE_HANDLER_INIT(NRF_CLOCK_LFCLKSRC_RC_250_PPM_4000MS_CALIBRATION, NULL);
-
-    /* システムイベントハンドラの設定 */
-    err_code = softdevice_sys_evt_handler_set(sys_evt_dispatch);
-    APP_ERROR_CHECK(err_code);
-
     /* BLEスタックの有効化 */
     {
         ble_enable_params_t ble_enable_params;
@@ -521,12 +383,6 @@ static void ble_stack_init(void)
         memset(&ble_enable_params, 0, sizeof(ble_enable_params));
         ble_enable_params.gatts_enable_params.service_changed = IS_SRVC_CHANGED_CHARACT_PRESENT;
         err_code = sd_ble_enable(&ble_enable_params);
-        APP_ERROR_CHECK(err_code);
-    }
-
-    /* BLEイベントハンドラの設定 */
-    {
-        err_code = softdevice_ble_evt_handler_set(ble_evt_dispatch);
         APP_ERROR_CHECK(err_code);
     }
 
@@ -572,8 +428,9 @@ static void ble_stack_init(void)
 
         ios_init.evt_handler_in = svc_ios_handler_in;
         //ios_init.evt_handler_out = svc_ios_handler_out;
-        err_code = ble_ios_init(&m_ios, &ios_init);
-        APP_ERROR_CHECK(err_code);
+        ios_init.len_in = 64;
+        ios_init.len_out = 32;
+        ble_ios_init(&m_ios, &ios_init);
     }
 
     /*
@@ -632,9 +489,10 @@ static void ble_stack_init(void)
     {
         ble_conn_params_init_t cp_init = {0};
 
+		/* APP_TIMER_PRESCALER = 0 */
         cp_init.p_conn_params                  = NULL;
-        cp_init.first_conn_params_update_delay = APP_TIMER_TICKS(CONN_FIRST_PARAMS_UPDATE_DELAY, APP_TIMER_PRESCALER);
-        cp_init.next_conn_params_update_delay  = APP_TIMER_TICKS(CONN_NEXT_PARAMS_UPDATE_DELAY, APP_TIMER_PRESCALER);
+        cp_init.first_conn_params_update_delay = APP_TIMER_TICKS(CONN_FIRST_PARAMS_UPDATE_DELAY, 0);
+        cp_init.next_conn_params_update_delay  = APP_TIMER_TICKS(CONN_NEXT_PARAMS_UPDATE_DELAY, 0);
         cp_init.max_conn_params_update_count   = CONN_MAX_PARAMS_UPDATE_COUNT;
         cp_init.start_on_notify_cccd_handle    = BLE_GATT_HANDLE_INVALID;
         cp_init.disconnect_on_fail             = false;
@@ -730,35 +588,6 @@ static void conn_params_error_handler(uint32_t nrf_error)
 
 
 /**********************************************
- * BLE : Services
- **********************************************/
-
-/**
- * @brief I/Oサービスイベントハンドラ
- *
- * @param[in]   p_ios   I/Oサービス構造体
- * @param[in]   p_value 受信バッファ
- * @param[in]   length  受信データ長
- */
-static void svc_ios_handler_in(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length)
-{
-    app_trace_log("svc_ios_handler_in\r\n");
-}
-
-/**
- * @brief I/Oサービスイベントハンドラ
- *
- * @param[in]   p_ios   I/Oサービス構造体
- * @param[in]   p_value 受信バッファ
- * @param[in]   length  受信データ長
- */
-static void svc_ios_handler_out(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length)
-{
-    app_trace_log("svc_ios_handler_out\r\n");
-}
-
-
-/**********************************************
  * BLE stack
  **********************************************/
 
@@ -804,7 +633,7 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
         led_off(LED_PIN_NO_CONNECTED);
         m_conn_handle = BLE_CONN_HANDLE_INVALID;
 
-        ble_adv_start();
+        app_ble_start();
         break;
 
     //SMP Paring要求を受信したとき
@@ -890,48 +719,31 @@ static void ble_evt_handler(ble_evt_t *p_ble_evt)
 }
 
 
+/**********************************************
+ * BLE : Services
+ **********************************************/
+
 /**
- * @brief BLEイベントハンドラ
+ * @brief I/Oサービスイベントハンドラ
  *
- * @details BLEスタックイベント受信後、メインループのスケジューラから呼ばれる。
- *
- * @param[in]   p_ble_evt   BLEスタックイベント
+ * @param[in]   p_ios   I/Oサービス構造体
+ * @param[in]   p_value 受信バッファ
+ * @param[in]   length  受信データ長
  */
-static void ble_evt_dispatch(ble_evt_t *p_ble_evt)
+static void svc_ios_handler_in(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length)
 {
-    ble_evt_handler(p_ble_evt);
-    ble_conn_params_on_ble_evt(p_ble_evt);
-
-    //I/O Service
-    ble_ios_on_ble_evt(&m_ios, p_ble_evt);
-
-#ifdef BLE_DFU_APP_SUPPORT
-    /** @snippet [Propagating BLE Stack events to DFU Service] */
-    ble_dfu_on_ble_evt(&m_dfus, p_ble_evt);
-    /** @snippet [Propagating BLE Stack events to DFU Service] */
-#endif // BLE_DFU_APP_SUPPORT
+    app_trace_log("svc_ios_handler_in\r\n");
 }
 
-/**@brief システムイベント発生
+/**
+ * @brief I/Oサービスイベントハンドラ
  *
- * SoCでイベントが発生した場合にコールバックされる。
- *
- *
- * @param[in]   sys_evt   enum NRF_SOC_EVTS型(NRF_EVT_xxx). nrf_soc.hに定義がある.
- *      - NRF_EVT_HFCLKSTARTED
- *      - NRF_EVT_POWER_FAILURE_WARNING
- *      - NRF_EVT_FLASH_OPERATION_SUCCESS
- *      - NRF_EVT_FLASH_OPERATION_ERROR
- *      - NRF_EVT_RADIO_BLOCKED
- *      - NRF_EVT_RADIO_CANCELED
- *      - NRF_EVT_RADIO_SIGNAL_CALLBACK_INVALID_RETURN
- *      - NRF_EVT_RADIO_SESSION_IDLE
- *      - NRF_EVT_RADIO_SESSION_CLOSED
+ * @param[in]   p_ios   I/Oサービス構造体
+ * @param[in]   p_value 受信バッファ
+ * @param[in]   length  受信データ長
  */
-static void sys_evt_dispatch(uint32_t sys_evt)
+static void svc_ios_handler_out(ble_ios_t *p_ios, const uint8_t *p_value, uint16_t length)
 {
-    //ここでは異常発生のように扱っているが、必ずそうではないようなので、
-    //実装する際には注意しよう。
-    ble_advertising_on_sys_evt(sys_evt);
+    app_trace_log("svc_ios_handler_out\r\n");
 }
 

@@ -42,7 +42,6 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #source common to all targets
 C_SOURCE_FILES += $(SDK_PATH)/components/toolchain/system_nrf51.c
 C_SOURCE_FILES += $(SDK_PATH)/components/drivers_nrf/common/nrf_drv_common.c
-#C_SOURCE_FILES += $(SDK_PATH)/components/drivers_nrf/gpiote/nrf_drv_gpiote.c
 C_SOURCE_FILES += $(SDK_PATH)/components/drivers_nrf/pstorage/pstorage.c
 C_SOURCE_FILES += $(SDK_PATH)/components/libraries/timer/app_timer.c
 C_SOURCE_FILES += $(SDK_PATH)/components/libraries/timer/app_timer_appsh.c
@@ -66,7 +65,8 @@ endif
 
 #sources project
 C_SOURCE_FILES += $(PRJ_PATH)/services/ble_ios.c
-C_SOURCE_FILES += $(PRJ_PATH)/dev.c
+C_SOURCE_FILES += $(PRJ_PATH)/drivers.c
+C_SOURCE_FILES += $(PRJ_PATH)/app_ble.c
 C_SOURCE_FILES += $(PRJ_PATH)/main.c
 
 #assembly files common to all targets

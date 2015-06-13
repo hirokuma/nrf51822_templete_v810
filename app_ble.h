@@ -23,33 +23,29 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  */
-#ifndef DEV_H
-#define DEV_H
+#ifndef APP_BLE_H__
+#define APP_BLE_H__
 
 /**************************************************************************
  * include
  **************************************************************************/
 #include "nrf.h"
+#include "ble.h"
 
 
 /**************************************************************************
  * prototype
  **************************************************************************/
 
-/* DEV */
-void dev_init(void);
-void dev_event_exec(void);
-
-/* LED */
-void led_on(int pin);
-void led_off(int pin);
-
 /* BLE */
-void ble_adv_start(void);
+void app_ble_init(void);
+void app_ble_start(void);
 #ifdef BLE_DFU_APP_SUPPORT
-void ble_adv_stop(void)
+void app_ble_stop(void)
 #endif	//BLE_DFU_APP_SUPPORT
-int ble_is_connected(void);
-void ble_nofify(const uint8_t *p_data, uint16_t length);
+int app_ble_is_connected(void);
+void app_ble_nofify(const uint8_t *p_data, uint16_t length);
 
-#endif /* DEV_H */
+void app_ble_evt_dispatch(ble_evt_t *p_ble_evt);
+
+#endif /* APP_BLE_H__ */

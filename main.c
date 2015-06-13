@@ -32,7 +32,8 @@
 
 #include "boards.h"
 #include "main.h"
-#include "dev.h"
+#include "drivers.h"
+#include "app_ble.h"
 
 #include "app_error.h"
 #include "app_trace.h"
@@ -59,18 +60,19 @@
 int main(void)
 {
     // 初期化
-    dev_init();
+    drv_init();
+    app_ble_init();
 
     app_trace_init();
     app_trace_log("START\r\n");
 
     // 処理開始
     //timers_start();
-    ble_adv_start();
+    app_ble_start();
 
     // メインループ
     while (1) {
-        dev_event_exec();
+        drv_event_exec();
     }
 }
 

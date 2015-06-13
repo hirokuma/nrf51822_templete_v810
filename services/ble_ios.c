@@ -38,6 +38,8 @@
 
 #include "ble_ios.h"
 
+#include "app_error.h"
+
 
 /**************************************************************************
  * prototype
@@ -59,9 +61,8 @@ static uint32_t char_add_output(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_in
  *
  * @param[in]   p_ios       サービス構造体
  * @param[in]   p_ios_init  サービス初期化構造体
- * @retval      NRF_SUCCESS 成功
  */
-uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
+void ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
 {
     uint32_t   err_code;
 
@@ -72,9 +73,7 @@ uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
     //Base UUIDを登録し、UUID typeを取得
     ble_uuid128_t   base_uuid = { IOS_UUID_BASE };
     err_code = sd_ble_uuid_vs_add(&base_uuid, &p_ios->uuid_type);
-    if (err_code != NRF_SUCCESS) {
-        return err_code;
-    }
+    APP_ERROR_CHECK(err_code);
 
     //サービス登録
     ble_uuid_t ble_uuid;
@@ -82,21 +81,14 @@ uint32_t ble_ios_init(ble_ios_t *p_ios, const ble_ios_init_t *p_ios_init)
     ble_uuid.type = p_ios->uuid_type;
     err_code = sd_ble_gatts_service_add(BLE_GATTS_SRVC_TYPE_PRIMARY,
                                         &ble_uuid, &p_ios->service_handle);
-    if (err_code != NRF_SUCCESS) {
-        return err_code;
-    }
+    APP_ERROR_CHECK(err_code);
 
     //キャラクタリスティック登録
     err_code = char_add_input(p_ios, p_ios_init);
-    if (err_code != NRF_SUCCESS) {
-        return err_code;
-    }
-    err_code = char_add_output(p_ios, p_ios_init);
-    if (err_code != NRF_SUCCESS) {
-        return err_code;
-    }
+    APP_ERROR_CHECK(err_code);
 
-    return NRF_SUCCESS;
+    err_code = char_add_output(p_ios, p_ios_init);
+    APP_ERROR_CHECK(err_code);
 }
 
 
