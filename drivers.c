@@ -41,7 +41,6 @@
 #include "app_trace.h"
 
 
-
 /**************************************************************************
  * macro
  **************************************************************************/
@@ -255,7 +254,7 @@ static void softdevice_init(void)
     SOFTDEVICE_HANDLER_INIT(NRF_CLOCK_LFCLKSRC_RC_250_PPM_4000MS_CALIBRATION, NULL);
 
     /* システムイベントハンドラの設定 */
-    err_code = softdevice_sys_evt_handler_set(sys_evt_dispatch);
+    err_code = softdevice_sys_evt_handler_set(main_sys_evt_dispatch);
     APP_ERROR_CHECK(err_code);
 
 
@@ -264,28 +263,5 @@ static void softdevice_init(void)
         err_code = softdevice_ble_evt_handler_set(app_ble_evt_dispatch);
         APP_ERROR_CHECK(err_code);
     }
-}
-
-
-/**@brief システムイベント発生
- *
- * SoCでイベントが発生した場合にコールバックされる。
- *
- *
- * @param[in]   sys_evt   enum NRF_SOC_EVTS型(NRF_EVT_xxx). nrf_soc.hに定義がある.
- *      - NRF_EVT_HFCLKSTARTED
- *      - NRF_EVT_POWER_FAILURE_WARNING
- *      - NRF_EVT_FLASH_OPERATION_SUCCESS
- *      - NRF_EVT_FLASH_OPERATION_ERROR
- *      - NRF_EVT_RADIO_BLOCKED
- *      - NRF_EVT_RADIO_CANCELED
- *      - NRF_EVT_RADIO_SIGNAL_CALLBACK_INVALID_RETURN
- *      - NRF_EVT_RADIO_SESSION_IDLE
- *      - NRF_EVT_RADIO_SESSION_CLOSED
- */
-static void sys_evt_dispatch(uint32_t sys_evt)
-{
-	/* 上位のハンドラを呼ぶようにしておくか？ */
-	/* とりあえず放置しておく */
 }
 
