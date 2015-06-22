@@ -42,7 +42,7 @@ remduplicates = $(strip $(if $1,$(firstword $1) $(call remduplicates,$(filter-ou
 #source common to all targets
 C_SOURCE_FILES += $(SDK_PATH)/components/toolchain/system_nrf51.c
 C_SOURCE_FILES += $(SDK_PATH)/components/drivers_nrf/common/nrf_drv_common.c
-#C_SOURCE_FILES += $(SDK_PATH)/components/drivers_nrf/pstorage/pstorage.c
+C_SOURCE_FILES += $(SDK_PATH)/components/drivers_nrf/pstorage/pstorage.c
 C_SOURCE_FILES += $(SDK_PATH)/components/libraries/timer/app_timer.c
 C_SOURCE_FILES += $(SDK_PATH)/components/libraries/timer/app_timer_appsh.c
 C_SOURCE_FILES += $(SDK_PATH)/components/libraries/scheduler/app_scheduler.c
