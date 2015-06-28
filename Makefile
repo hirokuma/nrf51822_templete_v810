@@ -75,6 +75,7 @@ endif
 C_SOURCE_FILES += $(PRJ_PATH)/services/ble_ios.c
 C_SOURCE_FILES += $(PRJ_PATH)/drivers.c
 C_SOURCE_FILES += $(PRJ_PATH)/app_ble.c
+C_SOURCE_FILES += $(PRJ_PATH)/app_handler.c
 C_SOURCE_FILES += $(PRJ_PATH)/main.c
 
 #assembly files common to all targets
@@ -244,9 +245,9 @@ genhex:
 	$(NO_ECHO)$(OBJCOPY) -O ihex $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).hex
 
 echosize:
-	-@echo ""
+	-@echo "-------------------"
 	$(NO_ECHO)$(SIZE) $(OUTPUT_BINARY_DIRECTORY)/$(OUTPUT_FILENAME).out
-	-@echo ""
+	-@echo "-------------------"
 
 clean:
 	$(RM) $(BUILD_DIRECTORIES)

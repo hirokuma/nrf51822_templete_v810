@@ -31,8 +31,9 @@
 #include <string.h>
 
 #include "boards.h"
-#include "drivers.h"
+#include "app_handler.h"
 #include "app_ble.h"
+#include "drivers.h"
 
 #include "app_error.h"
 #include "app_trace.h"
@@ -51,34 +52,57 @@
  **************************************************************************/
 
 /**************************************************************************
- * main entry
+ * public function
  **************************************************************************/
 
-/**@brief main
+/**@brief エラーハンドラ
+ *
+ * APP_ERROR_HANDLER()やAPP_ERROR_CHECK()から呼び出される(app_error.h)。
+ * 引数は見ず、ASSERT LEDを点灯させて処理を止める。
+ *
+ * @param[in] error_code  エラーコード
+ * @param[in] line_num    エラー発生行(__LINE__など)
+ * @param[in] p_file_name エラー発生ファイル(__FILE__など)
  */
-int main(void)
+void app_error_handler(uint32_t error_code, uint32_t line_num, const uint8_t *p_file_name)
 {
-    // 初期化
-    drv_init();
-    app_ble_init();
+    //ASSERT LED点灯
+    led_on(LED_PIN_NO_ASSERT);
 
-    app_trace_init();
-    app_trace_log("START\r\n");
-
-    // 処理開始
-    //timers_start();
-    app_ble_start();
-
-    // メインループ
-    while (1) {
-        drv_event_exec();
+#if 0
+    //リセットによる再起動
+    NVIC_SystemReset();
+#else
+    //留まる
+    while(1) {
+        __WFI();
     }
+#endif
 }
 
 
-/**************************************************************************
- * public function
- **************************************************************************/
+/**@brief システムイベント発生
+ *
+ * SoCでイベントが発生した場合にコールバックされる。
+ *
+ *
+ * @param[in]   sys_evt   enum NRF_SOC_EVTS型(NRF_EVT_xxx). nrf_soc.hに定義がある.
+ *      - NRF_EVT_HFCLKSTARTED
+ *      - NRF_EVT_POWER_FAILURE_WARNING
+ *      - NRF_EVT_FLASH_OPERATION_SUCCESS
+ *      - NRF_EVT_FLASH_OPERATION_ERROR
+ *      - NRF_EVT_RADIO_BLOCKED
+ *      - NRF_EVT_RADIO_CANCELED
+ *      - NRF_EVT_RADIO_SIGNAL_CALLBACK_INVALID_RETURN
+ *      - NRF_EVT_RADIO_SESSION_IDLE
+ *      - NRF_EVT_RADIO_SESSION_CLOSED
+ */
+void main_sys_evt_dispatch(uint32_t sys_evt)
+{
+	/* 上位のハンドラを呼ぶようにしておくか？ */
+	/* とりあえず放置しておく */
+}
+
 
 /**************************************************************************
  * private function

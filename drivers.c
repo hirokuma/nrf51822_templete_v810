@@ -32,7 +32,7 @@
 #include "boards.h"
 #include "drivers.h"
 #include "app_ble.h"
-#include "main.h"
+#include "app_handler.h"
 
 #include "app_error.h"
 
